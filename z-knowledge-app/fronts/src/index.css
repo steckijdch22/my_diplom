@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Оставьте ваши переменные как есть, они отличные */
+  --text: #6b6375;
+  --text-h: #08060d;
+  /* ... остальной список ... */
+}
+
+/* Оставляем общие настройки рендеринга */
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Оставляем структуру контейнера, чтобы всё приложение центрировалось */
+#root {
+  margin: 0 auto;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+/* ========================================= */
+/* СТИЛИ РЕДАКТОРА (GOOGLE DOCS STYLE)       */
+/* ========================================= */
+
+/* 1. Настройка тулбара */
+.ql-toolbar.ql-snow {
+  border: none !important;
+  background: transparent !important;
+  padding: 10px 0 !important;
+}
+
+/* 2. Настройка контейнера текста */
+.ql-container.ql-snow {
+  border: none !important;
+}
+
+/* 3. Сам лист бумаги и текст (Отступы полей) */
+.ql-editor {
+  padding: 80px 90px !important; /* Поля документа (сверху 80px, по бокам 90px) */
+  min-height: 1000px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #1f2937;
+  overflow-y: visible !important; /* Запрещаем внутренний скролл, скроллится вся страница */
+}
+
+/* 4. Заголовки */
+.ql-editor h1 {
+  font-size: 2.5em;
+  font-weight: 800;
+  margin-bottom: 0.5em;
+  color: #111827;
+}
+.ql-editor h2 {
+  font-size: 1.8em;
+  font-weight: 700;
+  margin-top: 1em;
+  color: #374151;
+}
+.ql-editor p {
+  margin-bottom: 1em;
+}
+
+/* 5. Подсказка (Placeholder) */
+.ql-editor.ql-blank::before {
+  left: 90px !important; /* Выравниваем по левому полю */
+  font-style: italic;
+  color: #9ca3af;
+}
+
+/* 6. Совместные курсоры */
+.ql-cursor {
+  position: absolute;
+  height: 1.3em;
+  width: 2px;
+}
+.ql-cursor-caret {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+}
+.ql-cursor-flag {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  padding: 2px 6px;
+  border-radius: 4px 4px 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  z-index: 10;
+}
