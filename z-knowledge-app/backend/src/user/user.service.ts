@@ -7,7 +7,7 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: Prisma.UserCreateInput) {
-    await this.prisma.user.create({ data });
+    return await this.prisma.user.create({ data });
   }
 
   async findByEmail(email: string) {

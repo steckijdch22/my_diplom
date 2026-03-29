@@ -14,8 +14,20 @@ datasource db {
 }
 
 model User {
-  is  String @id @default(ulid())
+  id  String @id @default(uuid())
   username String
   email String @unique
   password String
+  documents Document[]
+}
+
+model Document {
+  id String  @id @default(uuid())
+  title String
+  encryptedContent Bytes?   
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
 }
