@@ -20,9 +20,13 @@ export class DocumentController {
 
   @Post()
   async create(@Body() dto: CreateDocumentDto, @Request() req: any) {
-    return this.docService.create(req.user.userId, dto.title);
+    return this.docService.create(req.user.userId, dto.title, dto.documentKey);
   }
 
+  @Get(':id')
+  async getOne(@Param('id') id: string) {
+    return this.docService.getDocument(id);
+  }
   @Get()
   async findAll(@Request() req: any) {
     return this.docService.findAll(req.user.userId);

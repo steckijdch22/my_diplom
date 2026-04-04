@@ -1,15 +1,27 @@
 import React, { useState } from "react";
 import { registration } from "../api/auth";
+import { exportPublicKey, generateUserKeyPair } from "../utils/crypto";
+import { savePrivateKeys } from "../utils/keyStorage";
+import { useNavigate } from "react-router-dom";
 
 const Register = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const navigate = useNavigate();
 
   const handleRegister = async () => {
     try {
-      if (email && password) await registration(email, password);
+      if (!email || !password) {
+        return;
+      }
+      const keys = await generateUserKeyPair();
+      const pubStr = await exportPublicKey(keys.publicKey);
+      const res = await registration(email, password, pubStr);
+
+      await savePrivateKeys(res.user.id, keys.privateKey);
       setEmail("");
       setPassword("");
+      navigate("/dashboard");
     } catch (error: any) {
       console.log(error.message);
     }

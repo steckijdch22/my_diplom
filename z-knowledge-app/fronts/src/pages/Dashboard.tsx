@@ -4,6 +4,7 @@ import DocumentBlock from "../components/DocumentBlock";
 import { CreateDocumentModal } from "../components/CreateDocumentModal";
 import { createDocumentApi, getDocumentsApi } from "../api/document.api";
 import { useAuth } from "../context/AuthContext";
+import { generateDocKey, importPublicKey, wrapKey } from "../utils/crypto";
 
 interface DocumentItem {
   id: string;
@@ -13,46 +14,43 @@ interface DocumentItem {
   labels: string[];
 }
 
-const MOCK_DOCS: DocumentItem[] = [
-  {
-    id: "1",
-    title: "Курсовая работа. ZK-CRDT",
-    role: "owner",
-    updatedAt: "2023-10-25",
-    labels: ["Учеба", "Важное"],
-  },
-  {
-    id: "2",
-    title: "План проекта",
-    role: "owner",
-    updatedAt: "2023-10-24",
-    labels: ["Работа"],
-  },
-  {
-    id: "3",
-    title: "Секретные записи (Доступ от Антона)",
-    role: "shared",
-    updatedAt: "2023-10-20",
-    labels: ["Shared"],
-  },
-];
-
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [openNewModal, setNewOpenModal] = useState<boolean>(false);
 
   const handleCreateNew = async (title: string) => {
-    const document = await createDocumentApi(title);
+    try {
+      console.log("🚀 Начало создания документа...");
 
-    const newDoc: DocumentItem = {
-      id: document.id,
-      title: document.title,
-      role: "owner",
-      updatedAt: new Date(document.updatedAt).toISOString().split("T")[0],
-      labels: ["Новый"],
-    };
-    setDocuments([newDoc, ...documents]);
+      if (!user || !user.publicKey) {
+        console.error(
+          "❌ Ошибка: данные пользователя или публичный ключ отсутствуют!",
+          user,
+        );
+        return;
+      }
+
+      const aesKey = await generateDocKey();
+
+      const myRsaPubKey = await importPublicKey(user.publicKey);
+
+      const wrappedKey = await wrapKey(aesKey, myRsaPubKey);
+
+      const document = await createDocumentApi(title, wrappedKey);
+
+      const newDoc: DocumentItem = {
+        id: document.id,
+        title: document.title,
+        role: "owner",
+        updatedAt: new Date(document.updatedAt).toISOString().split("T")[0],
+        labels: ["Новый"],
+      };
+
+      setDocuments([newDoc, ...documents]);
+    } catch (error: any) {
+      console.error("❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ СОЗДАНИИ:", error);
+    }
   };
 
   useEffect(() => {

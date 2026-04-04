@@ -28,6 +28,7 @@ export class AuthService {
       email: dto.email,
       password: hashedPassword,
       username: dto.username,
+      publicKey: dto.publicKey,
     });
 
     return {
@@ -53,7 +54,11 @@ export class AuthService {
   }
 
   private generateToken(user: User) {
-    const payload: jwtPayloadInterface = { sub: user.id, email: user.email };
+    const payload: jwtPayloadInterface = {
+      sub: user.id,
+      email: user.email,
+      publicKey: user.publicKey,
+    };
     return { accessToken: this.jwtService.sign(payload) };
   }
 }

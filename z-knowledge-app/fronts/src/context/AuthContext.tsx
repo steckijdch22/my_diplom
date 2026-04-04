@@ -4,6 +4,7 @@ import { api } from "../api/api";
 interface User {
   userId: string;
   email: string;
+  publicKey: string;
 }
 
 const AuthContext = createContext<{

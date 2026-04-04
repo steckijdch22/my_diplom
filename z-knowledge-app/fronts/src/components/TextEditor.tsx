@@ -1,9 +1,13 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Quill from "quill";
 import * as Y from "yjs";
 import "quill/dist/quill.snow.css";
 import { socket } from "../api/socket";
 import { QuillBinding } from "y-quill";
+import { useAuth } from "../context/AuthContext";
+import { getPrivateKey } from "../utils/keyStorage";
+import { decryptData, encryptData, unwrapKey } from "../utils/crypto";
+import { debounce } from "lodash";
 
 const CURSOR_COLORS = [
   "#f56565",
@@ -19,14 +23,29 @@ const CURSOR_COLORS = [
 const getRandomColor = () =>
   CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
 
-export const TextEditor: React.FC<{ documentId: string }> = ({
-  documentId,
-}) => {
+export const TextEditor: React.FC<{
+  documentId: string;
+  wrappedKey: string;
+}> = ({ documentId, wrappedKey }) => {
+  const { user } = useAuth();
+  const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const initEncryption = async () => {
+      const privKey = await getPrivateKey(user!.userId);
+      const key = await unwrapKey(wrappedKey, privKey);
+      setAesKey(key);
+    };
+    if (user) {
+      initEncryption();
+    }
+  }, [wrappedKey]);
+
+  useEffect(() => {
     if (!editorRef.current || !toolbarRef.current) return;
+    if (!aesKey) return;
 
     editorRef.current.innerHTML = "";
     toolbarRef.current.innerHTML = "";
@@ -40,19 +59,31 @@ export const TextEditor: React.FC<{ documentId: string }> = ({
     socket.connect();
     socket.emit("join-document", documentId);
 
-    ydoc.on("update", (update, origin) => {
+    ydoc.on("update", async (update, origin) => {
       if (origin === socket) {
         return;
       }
-
+      const encrypted = await encryptData(update, aesKey);
       socket.emit("sync-update", {
         roomId: documentId,
-        update: update,
+        update: encrypted,
       });
+      triggerSnapshotSave();
     });
 
-    const handleReceiveUpdate = (update: ArrayBuffer) => {
-      Y.applyUpdate(ydoc, new Uint8Array(update), socket);
+    const triggerSnapshotSave = debounce(async () => {
+      const fullState = Y.encodeStateAsUpdate(ydoc);
+      const encryptedFullState = await encryptData(fullState, aesKey);
+
+      socket.emit("save-snapshot", {
+        roomId: documentId,
+        fullState: encryptedFullState,
+      });
+    }, 3000);
+
+    const handleReceiveUpdate = async (update: ArrayBuffer) => {
+      const decrypted = await decryptData(new Uint8Array(update), aesKey);
+      Y.applyUpdate(ydoc, decrypted, socket);
     };
 
     socket.on("receive-update", handleReceiveUpdate);
@@ -88,11 +119,13 @@ export const TextEditor: React.FC<{ documentId: string }> = ({
     const binding = new QuillBinding(ytext, quill);
 
     return () => {
+      triggerSnapshotSave.flush();
+      triggerSnapshotSave.cancel();
       socket.off("receive-update", handleReceiveUpdate);
       socket.disconnect();
       ydoc.destroy();
     };
-  }, [documentId]);
+  }, [documentId, aesKey]);
 
   return (
     <div className="w-full flex flex-col items-center">

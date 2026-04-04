@@ -12,4 +12,8 @@ export class registrationDto {
   @IsNotEmpty()
   @IsString()
   username: string;
+
+  @IsNotEmpty()
+  @IsString()
+  publicKey: string;
 }

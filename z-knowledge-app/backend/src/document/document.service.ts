@@ -5,9 +5,9 @@ import { PrismaService } from '../prisma.service';
 export class DocumentService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, title: string) {
+  async create(userId: string, title: string, documentKey) {
     return this.prisma.document.create({
-      data: { title, ownerId: userId },
+      data: { title, ownerId: userId, documentKey },
     });
   }
 

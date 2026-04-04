@@ -1,14 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { TextEditor } from "../components/TextEditor";
+import { getDocumentById } from "../api/document.api";
+import { DocumentType } from "../types/document.types";
 
 export const EditorRoom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [isDecrypting, setIsDecrypting] = useState(true);
+  const [document, setDocument] = useState<DocumentType | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsDecrypting(false), 1000);
-    return () => clearTimeout(timer);
+    const fetchDocument = async () => {
+      setIsDecrypting(true);
+      try {
+        if (!id) {
+          return;
+        }
+        const document = await getDocumentById(id);
+        setDocument(document);
+      } catch (error: any) {
+        console.log(error.message);
+      } finally {
+        setIsDecrypting(false);
+      }
+    };
+    fetchDocument();
   }, [id]);
 
   const handleShare = () => {
@@ -63,12 +79,16 @@ export const EditorRoom: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto relative bg-gray-100 flex flex-col">
-        {isDecrypting ? (
+        {isDecrypting || !document ? (
           <div className="flex justify-center mt-20 text-gray-500">
             Расшифровка ключей документа...
           </div>
         ) : (
-          <>{id && <TextEditor documentId={id} />}</>
+          <>
+            {id && (
+              <TextEditor documentId={id} wrappedKey={document.documentKey} />
+            )}
+          </>
         )}
       </main>
     </div>

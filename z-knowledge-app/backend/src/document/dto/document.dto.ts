@@ -4,6 +4,10 @@ export class CreateDocumentDto {
   @IsString()
   @IsNotEmpty()
   title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  documentKey: string;
 }
 
 export class UpdateDocumentDto {

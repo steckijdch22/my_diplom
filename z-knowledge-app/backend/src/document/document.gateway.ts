@@ -77,25 +77,20 @@ export class DocumentGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     const { roomId, update } = data;
-
     const updateUint8 = new Uint8Array(update);
+    console.log(
+      `[Socket] Получен апдейт для ${roomId}, размер: ${updateUint8.length} байт`,
+    );
     client.to(roomId).emit('receive-update', updateUint8);
+  }
 
-    const prevState = this.documentStates.get(roomId);
-    let mergedState: Uint8Array;
-    if (prevState && prevState.length > 0) {
-      try {
-        mergedState = Y.mergeUpdates([prevState, updateUint8]);
-      } catch (e) {
-        console.error('❌ Ошибка при слиянии Yjs:', e);
-        mergedState = updateUint8;
-      }
-    } else {
-      mergedState = updateUint8;
-    }
-    this.documentStates.set(roomId, mergedState);
+  @SubscribeMessage('save-snapshot')
+  handleSnapshot(@MessageBody() data: { roomId: string; fullState: any }) {
+    const { roomId, fullState } = data;
+    const stateUint8 = new Uint8Array(fullState);
 
-    this.scheduleSave(roomId, mergedState);
+    this.documentStates.set(roomId, stateUint8);
+    this.scheduleSave(roomId, stateUint8);
   }
 
   private scheduleSave(roomId: string, state: Uint8Array) {
@@ -104,9 +99,13 @@ export class DocumentGateway implements OnGatewayDisconnect {
     }
 
     const timer = setTimeout(async () => {
-      await this.documentService.updateContent(roomId, Buffer.from(state));
-      this.saveTimers.delete(roomId);
-    }, 5000);
+      try {
+        await this.documentService.updateContent(roomId, state);
+      } catch (err) {
+      } finally {
+        this.saveTimers.delete(roomId);
+      }
+    }, 7000);
 
     this.saveTimers.set(roomId, timer);
   }
