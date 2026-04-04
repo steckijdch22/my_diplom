@@ -24,6 +24,19 @@ export class DocumentService {
     return this.prisma.document.update({ where: { id }, data });
   }
 
+  async updateContent(id: string, content: Uint8Array) {
+    return this.prisma.document.update({
+      where: { id },
+      data: {
+        encryptedContent: Buffer.from(content),
+      },
+    });
+  }
+
+  async getDocument(id: string) {
+    return this.prisma.document.findUnique({ where: { id } });
+  }
+
   async delete(id: string, userId: string) {
     return this.prisma.document.deleteMany({ where: { id, ownerId: userId } });
   }

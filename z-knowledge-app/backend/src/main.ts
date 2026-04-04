@@ -20,12 +20,6 @@ async function bootstrap() {
     }),
   );
 
-  // src/main.ts
-  app.use((req, res, next) => {
-    console.log('🍪 Куки в запросе:', req.cookies);
-    next();
-  });
-
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

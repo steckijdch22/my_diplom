@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import Quill from "quill";
-import { QuillBinding } from "y-quill";
 import * as Y from "yjs";
-import { WebrtcProvider } from "y-webrtc";
 import "quill/dist/quill.snow.css";
+import { socket } from "../api/socket";
+import { QuillBinding } from "y-quill";
 
 const CURSOR_COLORS = [
   "#f56565",
@@ -37,6 +37,26 @@ export const TextEditor: React.FC<{ documentId: string }> = ({
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText("quill");
 
+    socket.connect();
+    socket.emit("join-document", documentId);
+
+    ydoc.on("update", (update, origin) => {
+      if (origin === socket) {
+        return;
+      }
+
+      socket.emit("sync-update", {
+        roomId: documentId,
+        update: update,
+      });
+    });
+
+    const handleReceiveUpdate = (update: ArrayBuffer) => {
+      Y.applyUpdate(ydoc, new Uint8Array(update), socket);
+    };
+
+    socket.on("receive-update", handleReceiveUpdate);
+
     const quill = new Quill(editorContainer, {
       modules: {
         toolbar: [
@@ -65,19 +85,11 @@ export const TextEditor: React.FC<{ documentId: string }> = ({
       toolbarRef.current.appendChild(generatedToolbar);
     }
 
-    const provider = new WebrtcProvider(`room-${documentId}`, ydoc, {
-      signaling: ["wss://signaling.yjs.dev"],
-    });
-
-    provider.awareness.setLocalStateField("user", {
-      name: `Юзер ${Math.floor(Math.random() * 100)}`,
-      color: getRandomColor(),
-    });
-
-    const binding = new QuillBinding(ytext, quill, provider.awareness);
+    const binding = new QuillBinding(ytext, quill);
 
     return () => {
-      provider.destroy();
+      socket.off("receive-update", handleReceiveUpdate);
+      socket.disconnect();
       ydoc.destroy();
     };
   }, [documentId]);
