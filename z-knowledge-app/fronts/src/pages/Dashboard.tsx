@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DocumentBlock from "../components/DocumentBlock";
+import { CreateDocumentModal } from "../components/CreateDocumentModal";
+import { createDocumentApi, getDocumentsApi } from "../api/document.api";
+import { useAuth } from "../context/AuthContext";
 
 interface DocumentItem {
   id: string;
@@ -35,24 +38,48 @@ const MOCK_DOCS: DocumentItem[] = [
 ];
 
 const Dashboard: React.FC = () => {
-  const [documents, setDocuments] = useState<DocumentItem[]>(MOCK_DOCS);
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [openNewModal, setNewOpenModal] = useState<boolean>(false);
 
-  const handleCreateNew = () => {
-    const title = prompt("Введите название нового документа:");
-    if (!title) return;
-
-    const newId = Math.random().toString(36).substring(2, 9);
+  const handleCreateNew = async (title: string) => {
+    const document = await createDocumentApi(title);
 
     const newDoc: DocumentItem = {
-      id: newId,
-      title: title,
+      id: document.id,
+      title: document.title,
       role: "owner",
-      updatedAt: new Date().toISOString().split("T")[0],
+      updatedAt: new Date(document.updatedAt).toISOString().split("T")[0],
       labels: ["Новый"],
     };
     setDocuments([newDoc, ...documents]);
   };
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      if (user?.userId) {
+        try {
+          const docsFromApi = await getDocumentsApi(user.userId);
+
+          const mappedDocuments: DocumentItem[] = docsFromApi.map(
+            (doc: any) => ({
+              id: doc.id,
+              title: doc.title,
+              role: "owner",
+              updatedAt: new Date(doc.updatedAt).toISOString().split("T")[0],
+              labels: ["Новый"],
+            }),
+          );
+
+          setDocuments(mappedDocuments);
+        } catch (error) {
+          console.error("Ошибка загрузки документов:", error);
+        }
+      }
+    };
+
+    fetchDocuments();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -78,16 +105,21 @@ const Dashboard: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Мои документы</h1>
           <button
-            onClick={handleCreateNew}
+            onClick={() => setNewOpenModal(true)}
             className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors flex items-center"
           >
             <span className="mr-2">+</span> Создать документ
           </button>
+          <CreateDocumentModal
+            isOpen={openNewModal}
+            onClose={() => setNewOpenModal(false)}
+            onSubmit={handleCreateNew}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {documents.map((doc) => (
-            <DocumentBlock document={doc} />
+            <DocumentBlock document={doc} key={doc.id} />
           ))}
         </div>
       </main>

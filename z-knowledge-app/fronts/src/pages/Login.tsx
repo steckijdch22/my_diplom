@@ -1,16 +1,23 @@
-import React, { use, useState } from "react";
+import { useState } from "react";
 import { login } from "../api/auth";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [password, setPassword] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+  const { checkAuth } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     try {
+      console.log(email, password);
       if (!email || !password) {
         return;
       }
       await login(email, password);
+      checkAuth();
+      navigate("/dashboard");
     } catch (error: any) {
       console.log("error with login", error.message);
     }
@@ -34,7 +41,7 @@ const Login = () => {
           className="w-full p-2 mb-6 border rounded"
         />
         <button
-          onClick={handleLogin}
+          onClick={() => handleLogin()}
           className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700"
         >
           Войти
