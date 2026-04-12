@@ -25,23 +25,11 @@ const getRandomColor = () =>
 
 export const TextEditor: React.FC<{
   documentId: string;
-  wrappedKey: string;
-}> = ({ documentId, wrappedKey }) => {
+  aesKey: CryptoKey;
+}> = ({ documentId, aesKey }) => {
   const { user } = useAuth();
-  const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const initEncryption = async () => {
-      const privKey = await getPrivateKey(user!.userId);
-      const key = await unwrapKey(wrappedKey, privKey);
-      setAesKey(key);
-    };
-    if (user) {
-      initEncryption();
-    }
-  }, [wrappedKey]);
 
   useEffect(() => {
     if (!editorRef.current || !toolbarRef.current) return;
@@ -88,6 +76,10 @@ export const TextEditor: React.FC<{
 
     socket.on("receive-update", handleReceiveUpdate);
 
+    socket.on("request-sync", () => {
+      triggerSnapshotSave.flush();
+    });
+
     const quill = new Quill(editorContainer, {
       modules: {
         toolbar: [
@@ -122,6 +114,7 @@ export const TextEditor: React.FC<{
       triggerSnapshotSave.flush();
       triggerSnapshotSave.cancel();
       socket.off("receive-update", handleReceiveUpdate);
+      socket.off("request-sync");
       socket.disconnect();
       ydoc.destroy();
     };

@@ -1,18 +1,24 @@
-import { openDB } from "idb";
+import { IDBPDatabase, openDB } from "idb";
 
 const DB_NAME = "ZeroDocKeys";
 const STORE_NAME = "privateKeys";
 
-export const savePrivateKeys = async (userId: string, key: CryptoKey) => {
-  const db = await openDB(DB_NAME, 1, {
+const getDB = async (): Promise<IDBPDatabase> => {
+  return openDB(DB_NAME, 1, {
     upgrade(db) {
-      db.createObjectStore(STORE_NAME);
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
     },
   });
+};
+
+export const savePrivateKeys = async (userId: string, key: CryptoKey) => {
+  const db = await getDB();
   await db.put(STORE_NAME, key, userId);
 };
 
 export const getPrivateKey = async (userId: string): Promise<CryptoKey> => {
-  const db = openDB(DB_NAME, 1);
-  return (await db).get(STORE_NAME, userId);
+  const db = await getDB();
+  return await db.get(STORE_NAME, userId);
 };

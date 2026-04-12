@@ -29,13 +29,12 @@ export class DocumentGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(roomId);
-
     this.socketToRoom.set(client.id, roomId);
 
     let currentState = this.documentStates.get(roomId);
 
     if (!currentState) {
-      const doc = await this.documentService.getDocument(roomId);
+      const doc = await this.documentService.getRawDocument(roomId);
       if (doc?.encryptedContent) {
         currentState = new Uint8Array(doc.encryptedContent);
         this.documentStates.set(roomId, currentState);
@@ -45,6 +44,8 @@ export class DocumentGateway implements OnGatewayDisconnect {
     if (currentState) {
       client.emit('receive-update', Buffer.from(currentState));
     }
+
+    client.to(roomId).emit('request-sync');
 
     console.log(`User ${client.id} joined room ${roomId}`);
   }
@@ -78,18 +79,19 @@ export class DocumentGateway implements OnGatewayDisconnect {
   ) {
     const { roomId, update } = data;
     const updateUint8 = new Uint8Array(update);
-    console.log(
-      `[Socket] Получен апдейт для ${roomId}, размер: ${updateUint8.length} байт`,
-    );
     client.to(roomId).emit('receive-update', updateUint8);
   }
 
   @SubscribeMessage('save-snapshot')
-  handleSnapshot(@MessageBody() data: { roomId: string; fullState: any }) {
+  handleSnapshot(
+    @MessageBody() data: { roomId: string; fullState: any },
+    @ConnectedSocket() client: Socket,
+  ) {
     const { roomId, fullState } = data;
     const stateUint8 = new Uint8Array(fullState);
 
     this.documentStates.set(roomId, stateUint8);
+    client.to(roomId).emit('receive-update', stateUint8);
     this.scheduleSave(roomId, stateUint8);
   }
 

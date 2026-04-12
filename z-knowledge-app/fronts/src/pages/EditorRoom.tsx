@@ -1,31 +1,60 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { TextEditor } from "../components/TextEditor";
-import { getDocumentById } from "../api/document.api";
-import { DocumentType } from "../types/document.types";
+import { getAccessUsers, getDocumentById } from "../api/document.api";
+import { DocumentType, UserWithAccess } from "../types/document.types";
+import { ShareDocumentModal } from "./ShareDocumentModal";
+import { useAuth } from "../context/AuthContext";
+import { getPrivateKey } from "../utils/keyStorage";
+import { unwrapKey } from "../utils/crypto";
 
 export const EditorRoom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [isDecrypting, setIsDecrypting] = useState(true);
   const [document, setDocument] = useState<DocumentType | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
+  const [usersWithAccess, setUsersWithAccess] = useState<
+    UserWithAccess[] | null
+  >(null);
 
   useEffect(() => {
     const fetchDocument = async () => {
       setIsDecrypting(true);
       try {
-        if (!id) {
+        if (!id || !user) {
           return;
         }
         const document = await getDocumentById(id);
         setDocument(document);
+
+        const privKey = await getPrivateKey(user.userId);
+        if (privKey) {
+          const decryptedKey = await unwrapKey(document.wrappedKey, privKey);
+          setAesKey(decryptedKey);
+        }
       } catch (error: any) {
         console.log(error.message);
       } finally {
         setIsDecrypting(false);
       }
     };
+
+    const fetchAccessUsers = async () => {
+      try {
+        if (!id) {
+          return;
+        }
+        const accessUsers = await getAccessUsers(id);
+        setUsersWithAccess(accessUsers);
+      } catch (error: any) {
+        console.log(error.message);
+      }
+    };
     fetchDocument();
-  }, [id]);
+    fetchAccessUsers();
+  }, [id, user]);
 
   const handleShare = () => {
     alert("Модальное окно Share...");
@@ -58,6 +87,7 @@ export const EditorRoom: React.FC = () => {
               type="text"
               defaultValue="Название документа"
               className="text-lg font-bold text-gray-800 bg-transparent border-none focus:ring-0 focus:outline-none hover:bg-gray-50 px-2 py-1 rounded cursor-text"
+              value={document?.title}
             />
             <div className="flex items-center px-2 mt-0.5">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1.5"></div>
@@ -70,7 +100,7 @@ export const EditorRoom: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <button
-            onClick={handleShare}
+            onClick={() => setIsShareModalOpen(true)}
             className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 px-4 py-1.5 rounded-md font-medium text-sm flex items-center transition-colors"
           >
             Поделиться
@@ -79,18 +109,23 @@ export const EditorRoom: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto relative bg-gray-100 flex flex-col">
-        {isDecrypting || !document ? (
+        {isDecrypting || !aesKey ? (
           <div className="flex justify-center mt-20 text-gray-500">
             Расшифровка ключей документа...
           </div>
         ) : (
-          <>
-            {id && (
-              <TextEditor documentId={id} wrappedKey={document.documentKey} />
-            )}
-          </>
+          <>{id && <TextEditor documentId={id} aesKey={aesKey} />}</>
         )}
       </main>
+      {aesKey && id && (
+        <ShareDocumentModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          usersWithAccess={usersWithAccess}
+          aesKey={aesKey}
+          docId={id}
+        />
+      )}
     </div>
   );
 };

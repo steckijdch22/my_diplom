@@ -4,12 +4,20 @@ import DocumentBlock from "../components/DocumentBlock";
 import { CreateDocumentModal } from "../components/CreateDocumentModal";
 import { createDocumentApi, getDocumentsApi } from "../api/document.api";
 import { useAuth } from "../context/AuthContext";
-import { generateDocKey, importPublicKey, wrapKey } from "../utils/crypto";
+import {
+  exportPrivateKey,
+  generateDocKey,
+  importPrivateKeyStr,
+  importPublicKey,
+  wrapKey,
+} from "../utils/crypto";
+import { getPrivateKey, savePrivateKeys } from "../utils/keyStorage";
+import { KeyWarningModal } from "../components/KeyWarningModal";
 
-interface DocumentItem {
+export interface DocumentItem {
   id: string;
   title: string;
-  role: "owner" | "shared";
+  role: "owner" | "guest";
   updatedAt: string;
   labels: string[];
 }
@@ -18,11 +26,10 @@ const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [openNewModal, setNewOpenModal] = useState<boolean>(false);
+  const [isKeyMissing, setIsKeyMissing] = useState<boolean>(false);
 
   const handleCreateNew = async (title: string) => {
     try {
-      console.log("🚀 Начало создания документа...");
-
       if (!user || !user.publicKey) {
         console.error(
           "❌ Ошибка: данные пользователя или публичный ключ отсутствуют!",
@@ -30,19 +37,14 @@ const Dashboard: React.FC = () => {
         );
         return;
       }
-
       const aesKey = await generateDocKey();
-
       const myRsaPubKey = await importPublicKey(user.publicKey);
-
       const wrappedKey = await wrapKey(aesKey, myRsaPubKey);
-
       const document = await createDocumentApi(title, wrappedKey);
-
       const newDoc: DocumentItem = {
         id: document.id,
         title: document.title,
-        role: "owner",
+        role: document.role,
         updatedAt: new Date(document.updatedAt).toISOString().split("T")[0],
         labels: ["Новый"],
       };
@@ -53,21 +55,67 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleExportKey = async () => {
+    try {
+      if (!user) {
+        return;
+      }
+      const privKey = await getPrivateKey(user.userId);
+      if (!privKey) {
+        alert("Приватный ключ не найден в браузере");
+        return;
+      }
+      const keyStr = await exportPrivateKey(privKey);
+      const blob = new Blob([keyStr], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `zerodoc_${user.email}.key`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Ошибка экспоррта", error);
+    }
+  };
+
+  const handleImportKey = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const keyStr = e.target?.result as string;
+        const importedKey = await importPrivateKeyStr(keyStr);
+        await savePrivateKeys(user.userId, importedKey);
+        setIsKeyMissing(false);
+        alert(
+          "Ключ успешно импортирован! Теперь вы можете открывать свои документы.",
+        );
+        window.location.reload();
+      } catch (error) {
+        alert("Ошибка импорта: неверный формат ключа");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   useEffect(() => {
     const fetchDocuments = async () => {
       if (user?.userId) {
         try {
           const docsFromApi = await getDocumentsApi(user.userId);
 
-          const mappedDocuments: DocumentItem[] = docsFromApi.map(
-            (doc: any) => ({
-              id: doc.id,
-              title: doc.title,
-              role: "owner",
-              updatedAt: new Date(doc.updatedAt).toISOString().split("T")[0],
-              labels: ["Новый"],
-            }),
-          );
+          const mappedDocuments: DocumentItem[] = docsFromApi.map((doc) => ({
+            id: doc.id,
+            title: doc.title,
+            role: doc.role,
+            updatedAt: new Date(doc.updatedAt).toISOString().split("T")[0],
+            labels: ["Новый"],
+          }));
 
           setDocuments(mappedDocuments);
         } catch (error) {
@@ -79,8 +127,22 @@ const Dashboard: React.FC = () => {
     fetchDocuments();
   }, [user]);
 
+  useEffect(() => {
+    const checkPrivKey = async () => {
+      if (!user) {
+        return;
+      }
+      const privKey = await getPrivateKey(user.userId);
+      if (!privKey) {
+        setIsKeyMissing(true);
+      }
+    };
+    checkPrivKey();
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      <KeyWarningModal onImport={handleImportKey} isOpen={isKeyMissing} />
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
@@ -88,8 +150,54 @@ const Dashboard: React.FC = () => {
           </div>
           <span className="text-xl font-semibold">ZeroDoc</span>
         </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-500">user@example.com</span>
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+            <button
+              onClick={handleExportKey}
+              className="text-xs font-medium px-3 py-1.5 hover:bg-white rounded-md transition-all flex items-center"
+              title="Скачать бэкап ключа"
+            >
+              <svg
+                className="w-3.5 h-3.5 mr-1.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Бэкап ключа
+            </button>
+
+            <label className="text-xs font-medium px-3 py-1.5 hover:bg-white rounded-md transition-all cursor-pointer flex items-center">
+              <svg
+                className="w-3.5 h-3.5 mr-1.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Импорт
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleImportKey}
+                accept=".key,.txt"
+              />
+            </label>
+          </div>
+
+          <span className="text-sm text-gray-500">{user?.email}</span>
           <Link
             to="/login"
             className="text-sm text-red-500 hover:text-red-700 font-medium"

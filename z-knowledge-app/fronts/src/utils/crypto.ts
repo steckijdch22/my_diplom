@@ -3,7 +3,11 @@ export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
 };
 
 export const base64ToArrayBuffer = (base64: string): Uint8Array => {
-  return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  try {
+    return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  } catch (err: any) {
+    throw err;
+  }
 };
 
 export const generateUserKeyPair = async (): Promise<CryptoKeyPair> => {
@@ -100,4 +104,24 @@ export const decryptData = async (
     data,
   );
   return new Uint8Array(decrypted);
+};
+
+export const exportPrivateKey = async (
+  privateKey: CryptoKey,
+): Promise<string> => {
+  const exported = await window.crypto.subtle.exportKey("pkcs8", privateKey);
+  return arrayBufferToBase64(exported);
+};
+
+export const importPrivateKeyStr = async (
+  base64: string,
+): Promise<CryptoKey> => {
+  const buffer = base64ToArrayBuffer(base64);
+  return await window.crypto.subtle.importKey(
+    "pkcs8",
+    buffer as BufferSource,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["decrypt", "unwrapKey"],
+  );
 };

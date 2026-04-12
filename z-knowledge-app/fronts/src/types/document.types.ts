@@ -1,9 +1,14 @@
 export type DocumentType = {
   id: string;
   title: string;
-  encryptedContent: BinaryType | null;
-  documentKey: string;
-  createdAt: Date;
+  role: "owner" | "guest";
+  wrappedKey: string;
   updatedAt: Date;
-  ownerId: string;
+  ownerEmail: string;
+};
+
+export type UserWithAccess = {
+  id: string;
+  email: string;
+  role: "owner" | "guest";
 };

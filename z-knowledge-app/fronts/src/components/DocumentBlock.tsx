@@ -1,13 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-
-type DocumentItem = {
-  id: string;
-  title: string;
-  role: "owner" | "shared";
-  updatedAt: string;
-  labels: string[];
-};
+import { DocumentItem } from "../pages/Dashboard";
 
 type DocumetnProps = {
   document: DocumentItem;
