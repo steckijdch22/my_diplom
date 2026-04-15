@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import { EditorRoom } from "./pages/EditorRoom";
 import { ProtectedRoute } from "./components/ProtectedRote";
 import { useAuth } from "./context/AuthContext";
+import { Toaster } from "sonner";
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -18,30 +19,33 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+    <>
+      <Toaster position="top-right" richColors closeButton expand={true} />
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
 
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/editor/:id" element={<EditorRoom />} />
-        </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/editor/:id" element={<EditorRoom />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }
 export default App;

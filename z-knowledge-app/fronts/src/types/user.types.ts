@@ -5,3 +5,9 @@ export type UserResponseDto = {
   password: string;
   publicKey: string;
 };
+
+export type JwtPayload = {
+  userId: string;
+  email: string;
+  publicKey: string;
+};

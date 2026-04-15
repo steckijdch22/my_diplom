@@ -17,6 +17,8 @@ import {
 } from "../utils/crypto";
 import { getPrivateKey, savePrivateKeys } from "../utils/keyStorage";
 import { KeyWarningModal } from "../components/KeyWarningModal";
+import { logoutApi } from "../api/auth";
+import { toast } from "sonner";
 
 export interface DocumentItem {
   id: string;
@@ -27,20 +29,20 @@ export interface DocumentItem {
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [openNewModal, setNewOpenModal] = useState<boolean>(false);
   const [isKeyMissing, setIsKeyMissing] = useState<boolean>(false);
 
   const handleCreateNew = async (title: string) => {
-    try {
-      if (!user || !user.publicKey) {
-        console.error(
-          "❌ Ошибка: данные пользователя или публичный ключ отсутствуют!",
-          user,
-        );
-        return;
-      }
+    if (!user || !user.publicKey) {
+      console.error(
+        "❌ Ошибка: данные пользователя или публичный ключ отсутствуют!",
+        user,
+      );
+      return;
+    }
+    const createAction = async () => {
       const aesKey = await generateDocKey();
       const myRsaPubKey = await importPublicKey(user.publicKey);
       const wrappedKey = await wrapKey(aesKey, myRsaPubKey);
@@ -53,10 +55,15 @@ const Dashboard: React.FC = () => {
         labels: ["Новый"],
       };
 
-      setDocuments([newDoc, ...documents]);
-    } catch (error: any) {
-      console.error("❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ СОЗДАНИИ:", error);
-    }
+      setDocuments((prev) => [newDoc, ...prev]);
+      return `Документ "${title}" создан и защищен`;
+    };
+
+    toast.promise(createAction(), {
+      loading: "Генерация ключей шифрования...",
+      success: (msg) => msg,
+      error: "Не удалось создать защищенный документ",
+    });
   };
 
   const handleExportKey = async () => {
@@ -66,7 +73,9 @@ const Dashboard: React.FC = () => {
       }
       const privKey = await getPrivateKey(user.userId);
       if (!privKey) {
-        alert("Приватный ключ не найден в браузере");
+        toast.error("Ключ не найден", {
+          description: "Приватный ключ отсутствует в этом браузере",
+        });
         return;
       }
       const keyStr = await exportPrivateKey(privKey);
@@ -77,8 +86,12 @@ const Dashboard: React.FC = () => {
       link.download = `zerodoc_${user.email}.key`;
       link.click();
       URL.revokeObjectURL(url);
+
+      toast.success("Бэкап ключа создан", {
+        description: "Сохраните этот файл в надежном месте!",
+      });
     } catch (error) {
-      console.error("Ошибка экспоррта", error);
+      toast.error("Ошибка при экспорте ключа");
     }
   };
 
@@ -89,31 +102,56 @@ const Dashboard: React.FC = () => {
     if (!file || !user) {
       return;
     }
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const keyStr = e.target?.result as string;
-        const importedKey = await importPrivateKeyStr(keyStr);
-        await savePrivateKeys(user.userId, importedKey);
-        setIsKeyMissing(false);
-        alert(
-          "Ключ успешно импортирован! Теперь вы можете открывать свои документы.",
-        );
-        window.location.reload();
-      } catch (error) {
-        alert("Ошибка импорта: неверный формат ключа");
-      }
-    };
-    reader.readAsText(file);
+    const importAction = new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const keyStr = e.target?.result as string;
+          const importedKey = await importPrivateKeyStr(keyStr);
+          await savePrivateKeys(user.userId, importedKey);
+          resolve("Ключ успешно импортирован");
+          setIsKeyMissing(false);
+          window.location.reload();
+        } catch (err) {
+          reject("Неверный формат файла ключа");
+        }
+      };
+      reader.onerror = () => reject("Ошибка чтения файла");
+      reader.readAsText(file);
+    });
+    toast.promise(importAction, {
+      loading: "Проверка и импорт ключа...",
+      success: (msg: any) => msg,
+      error: (err) => err,
+    });
   };
 
   const handleDelete = async (docId: string) => {
-    try {
+    const deleteAction = async () => {
       const deletedDoc = await deleteDocument(docId);
       setDocuments((prev) => prev.filter((doc) => doc.id !== deletedDoc.id));
-    } catch (error: any) {
-      console.error(error.message);
-    }
+      return "Документ удален";
+    };
+
+    toast.promise(deleteAction(), {
+      loading: "Удаление документа...",
+      success: (msg) => msg,
+      error: "Ошибка при удалении. Проверьте права доступа.",
+    });
+  };
+
+  const handleLogout = async () => {
+    const logoutAction = async () => {
+      await logoutApi();
+      await checkAuth();
+      return "Вы вышли из системы";
+    };
+
+    toast.promise(logoutAction(), {
+      loading: "Завершение сессии...",
+      success: (msg) => msg,
+      error: "Ошибка при выходе",
+    });
   };
 
   useEffect(() => {
@@ -211,12 +249,12 @@ const Dashboard: React.FC = () => {
           </div>
 
           <span className="text-sm text-gray-500">{user?.email}</span>
-          <Link
-            to="/login"
+          <button
+            onClick={handleLogout}
             className="text-sm text-red-500 hover:text-red-700 font-medium"
           >
             Выйти
-          </Link>
+          </button>
         </div>
       </nav>
 

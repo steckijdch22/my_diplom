@@ -13,7 +13,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { loginDto } from './dto/login.dto';
 import { registrationDto } from './dto/registration.dto';
-import { sendAccessTokenCookie } from './util/cookieStore';
+import { clearAccessToken, sendAccessTokenCookie } from './util/cookieStore';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -37,10 +37,15 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, user } = await this.authService.login(dto);
-
     sendAccessTokenCookie(res, accessToken);
-
     return { user };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Res({ passthrough: true }) res: Response) {
+    clearAccessToken(res);
+    return { message: 'Logged out successfully' };
   }
 
   @UseGuards(JwtAuthGuard)

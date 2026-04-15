@@ -3,6 +3,7 @@ import { registration } from "../api/auth";
 import { exportPublicKey, generateUserKeyPair } from "../utils/crypto";
 import { savePrivateKeys } from "../utils/keyStorage";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const Register = () => {
   const [email, setEmail] = useState<string>("");
@@ -12,6 +13,7 @@ const Register = () => {
   const handleRegister = async () => {
     try {
       if (!email || !password) {
+        toast.warning("Пожалуйста, заполните все поля");
         return;
       }
       const keys = await generateUserKeyPair();
@@ -21,9 +23,9 @@ const Register = () => {
       await savePrivateKeys(res.user.id, keys.privateKey);
       setEmail("");
       setPassword("");
-      navigate("/dashboard");
+      toast.success("Аккаунт создан успешно!");
     } catch (error: any) {
-      console.log(error.message);
+      toast.error(error.response?.data?.message || "Ошибка при входе");
     }
   };
   return (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { login } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const Login = () => {
   const [password, setPassword] = useState<string>("");
@@ -13,13 +14,15 @@ const Login = () => {
     try {
       console.log(email, password);
       if (!email || !password) {
+        toast.warning("Пожалуйста, заполните все поля");
         return;
       }
       await login(email, password);
       await checkAuth();
+      toast.success("С возвращением!");
       navigate("/dashboard");
     } catch (error: any) {
-      console.log("error with login", error.message);
+      toast.error(error.response?.data?.message || "Ошибка при входе");
     }
   };
   return (

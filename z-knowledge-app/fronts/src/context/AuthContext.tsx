@@ -1,5 +1,12 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 import { api } from "../api/api";
+import { checkProfileApi } from "../api/auth";
 
 interface User {
   userId: string;
@@ -7,44 +14,44 @@ interface User {
   publicKey: string;
 }
 
-const AuthContext = createContext<{
+interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  checkAuth: () => void;
-}>({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  checkAuth: () => {},
-});
+  checkAuth: () => Promise<void>;
+}
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
   const checkAuth = async () => {
-    setIsLoading(true);
     try {
-      await api.get("/auth/profile");
+      const userData = await checkProfileApi();
+      setUser(userData);
       setIsAuthenticated(true);
-    } catch {
+    } catch (error) {
+      setUser(null);
       setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    api
-      .get("/auth/profile")
-      .then((res) => {
-        setUser(res.data);
+    const initAuth = async () => {
+      try {
+        const userData = await checkProfileApi();
+        setUser(userData);
         setIsAuthenticated(true);
-      })
-      .catch(() => setIsAuthenticated(false))
-      .finally(() => setIsLoading(false));
+      } catch {
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initAuth();
   }, []);
 
   return (
@@ -56,4 +63,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
+};

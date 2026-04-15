@@ -3,6 +3,7 @@ import { UserWithAccess, DocumentType } from "../types/document.types";
 import { addUserAccess, deleteUserAccess } from "../api/document.api";
 import { getUserByEmailAPI } from "../api/user.api";
 import { importPublicKey, wrapKey } from "../utils/crypto";
+import { toast } from "sonner";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export const ShareDocumentModal: React.FC<ShareModalProps> = ({
     try {
       const user = await getUserByEmailAPI(email);
       if (!user) {
-        window.alert("Пользователь с таким email не найден");
+        toast.error("Пользователь с таким email не найден");
         return;
       }
       const publicUserKey = await importPublicKey(user.publicKey);
@@ -43,11 +44,13 @@ export const ShareDocumentModal: React.FC<ShareModalProps> = ({
 
       await addUserAccess(document.id, email, encryptedKey);
 
-      setEmail("");
       onRefresh();
-      window.alert(`Доступ для ${email} успешно добавлен`);
+      toast.success(`Доступ для ${email} успешно добавлен`);
+      setEmail("");
     } catch (error: any) {
-      window.alert(`Ошибка: ${error.message}`);
+      toast.error(
+        error.response?.data?.message || "Ошибка при добавлении пользователя",
+      );
     } finally {
       setIsInviting(false);
     }
@@ -55,13 +58,19 @@ export const ShareDocumentModal: React.FC<ShareModalProps> = ({
 
   const executeRemove = async () => {
     if (!userToDelete) return;
-    try {
+    const removeAction = async () => {
       await deleteUserAccess(document.id, userToDelete.id);
-      onRefresh();
-      setUserToDelete(null);
-    } catch (error: any) {
-      window.alert(`Ошибка при удалении: ${error.message}`);
-    }
+      return `Доступ для ${userToDelete.email} отозван`;
+    };
+    toast.promise(removeAction(), {
+      loading: "Удаление доступа...",
+      success: (msg) => {
+        onRefresh();
+        setUserToDelete(null);
+        return msg;
+      },
+      error: "Не удалось отозвать доступ",
+    });
   };
 
   if (!isOpen || !usersWithAccess) return null;

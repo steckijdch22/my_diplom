@@ -1,5 +1,6 @@
 import { AxiosResponse } from "axios";
 import { api } from "./api";
+import { JwtPayload } from "../types/user.types";
 
 type RegistrationResponse = {
   user: {
@@ -32,5 +33,15 @@ export const login = async (email: string, password: string) => {
     email,
     password,
   });
+  return response.data;
+};
+
+export const logoutApi = async () => {
+  const response = await api.post("/auth/logout");
+  return response.data;
+};
+
+export const checkProfileApi = async () => {
+  const response: AxiosResponse<JwtPayload> = await api.get("/auth/profile");
   return response.data;
 };
