@@ -69,6 +69,16 @@ export class DocumentController {
     return this.docService.update(id, req.user.userId, dto);
   }
 
+  @Delete(':docId/user-access/:userId')
+  async deleteUserAccess(
+    @Param('docId') docId: string,
+    @Param('userId') userId: string,
+    @Request() req: any,
+  ) {
+    const ownerId = req.user.userId;
+    return this.docService.deleteUserAccess(ownerId, userId, docId);
+  }
+
   @Delete(':id')
   async delete(@Param('id') id: string, @Request() req: any) {
     return this.docService.delete(id, req.user.userId);

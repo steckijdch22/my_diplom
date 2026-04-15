@@ -19,14 +19,19 @@ export class DocumentService {
         },
       });
 
-      await tx.documentAccess.create({
+      const documentAccess = await tx.documentAccess.create({
         data: {
           documentId: document.id,
           userId: userId,
           encryptedKey: documentKey,
         },
+        include: {
+          document: {
+            include: { owner: { select: { id: true, email: true } } },
+          },
+        },
       });
-      return document;
+      return DocumentMapper.toResponseDto(documentAccess, userId);
     });
   }
 
@@ -149,6 +154,32 @@ export class DocumentService {
   }
 
   async delete(id: string, userId: string) {
-    return this.prisma.document.deleteMany({ where: { id, ownerId: userId } });
+    const document = await this.prisma.document.findFirst({
+      where: { ownerId: userId, id: id },
+    });
+    if (!document) {
+      throw new NotFoundException('документ для удаления не найден');
+    }
+    return await this.prisma.document.delete({ where: { id } });
+  }
+
+  async deleteUserAccess(ownerId: string, userId: string, docId: string) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id: docId,
+        ownerId: ownerId,
+      },
+    });
+    if (!document) {
+      throw new Error('Документ не найден');
+    }
+    return await this.prisma.documentAccess.delete({
+      where: {
+        documentId_userId: {
+          documentId: docId,
+          userId: userId,
+        },
+      },
+    });
   }
 }

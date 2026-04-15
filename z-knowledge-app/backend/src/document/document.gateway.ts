@@ -9,19 +9,20 @@ import {
 import { DocumentService } from './document.service';
 import { Socket, Server } from 'socket.io';
 import * as Y from 'yjs';
+import { RedisService } from 'src/redis/redis.service';
 
 @WebSocketGateway({
-  cors: { origin: 'http://localhost:5173', credentials: true },
+  cors: { origin: process.env.CLIENT_URL, credentials: true },
 })
 export class DocumentGateway implements OnGatewayDisconnect {
   @WebSocketServer() server: Server;
-
-  private documentStates = new Map<string, Uint8Array>();
   private saveTimers = new Map<string, NodeJS.Timeout>();
-
   private socketToRoom = new Map<string, string>();
 
-  constructor(private readonly documentService: DocumentService) {}
+  constructor(
+    private readonly documentService: DocumentService,
+    private readonly redisService: RedisService,
+  ) {}
 
   @SubscribeMessage('join-document')
   async handleJoin(
@@ -29,15 +30,16 @@ export class DocumentGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(roomId);
+    const key = this.getRedisKey(roomId);
     this.socketToRoom.set(client.id, roomId);
 
-    let currentState = this.documentStates.get(roomId);
+    let currentState = await this.redisService.get(key);
 
     if (!currentState) {
       const doc = await this.documentService.getRawDocument(roomId);
       if (doc?.encryptedContent) {
         currentState = new Uint8Array(doc.encryptedContent);
-        this.documentStates.set(roomId, currentState);
+        await this.redisService.set(key, currentState);
       }
     }
 
@@ -53,6 +55,7 @@ export class DocumentGateway implements OnGatewayDisconnect {
   async handleDisconnect(client: Socket) {
     const roomId = this.socketToRoom.get(client.id);
     if (roomId) {
+      const key = this.getRedisKey(roomId);
       this.socketToRoom.delete(client.id);
       const sockets = await this.server.in(roomId).fetchSockets();
 
@@ -61,12 +64,12 @@ export class DocumentGateway implements OnGatewayDisconnect {
           clearTimeout(this.saveTimers.get(roomId));
           this.saveTimers.delete(roomId);
 
-          const finalState = this.documentStates.get(roomId);
+          const finalState = await this.redisService.get(key);
           if (finalState) {
             await this.documentService.updateContent(roomId, finalState);
           }
         }
-        this.documentStates.delete(roomId);
+        await this.redisService.del(key);
       }
     }
     console.log(`User ${client.id} disconnected`);
@@ -83,14 +86,15 @@ export class DocumentGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('save-snapshot')
-  handleSnapshot(
+  async handleSnapshot(
     @MessageBody() data: { roomId: string; fullState: any },
     @ConnectedSocket() client: Socket,
   ) {
     const { roomId, fullState } = data;
+    const key = this.getRedisKey(roomId);
     const stateUint8 = new Uint8Array(fullState);
 
-    this.documentStates.set(roomId, stateUint8);
+    await this.redisService.set(key, stateUint8);
     client.to(roomId).emit('receive-update', stateUint8);
     this.scheduleSave(roomId, stateUint8);
   }
@@ -110,5 +114,9 @@ export class DocumentGateway implements OnGatewayDisconnect {
     }, 7000);
 
     this.saveTimers.set(roomId, timer);
+  }
+
+  private getRedisKey(roomId: string): string {
+    return `doc:${roomId}`;
   }
 }

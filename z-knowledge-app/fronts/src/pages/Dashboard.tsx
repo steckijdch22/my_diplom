@@ -2,7 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DocumentBlock from "../components/DocumentBlock";
 import { CreateDocumentModal } from "../components/CreateDocumentModal";
-import { createDocumentApi, getDocumentsApi } from "../api/document.api";
+import {
+  createDocumentApi,
+  deleteDocument,
+  getDocumentsApi,
+} from "../api/document.api";
 import { useAuth } from "../context/AuthContext";
 import {
   exportPrivateKey,
@@ -101,6 +105,15 @@ const Dashboard: React.FC = () => {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleDelete = async (docId: string) => {
+    try {
+      const deletedDoc = await deleteDocument(docId);
+      setDocuments((prev) => prev.filter((doc) => doc.id !== deletedDoc.id));
+    } catch (error: any) {
+      console.error(error.message);
+    }
   };
 
   useEffect(() => {
@@ -225,7 +238,11 @@ const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {documents.map((doc) => (
-            <DocumentBlock document={doc} key={doc.id} />
+            <DocumentBlock
+              document={doc}
+              key={doc.id}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       </main>

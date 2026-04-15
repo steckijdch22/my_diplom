@@ -40,7 +40,7 @@ model DocumentAccess{
   userId String
   encryptedKey String
   user User @relation(fields: [userId], references: [id])
-  document Document @relation(fields: [documentId], references: [id])
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@unique([documentId,userId])
 }

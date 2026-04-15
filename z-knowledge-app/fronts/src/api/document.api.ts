@@ -44,3 +44,17 @@ export const addUserAccess = async (
   });
   return res.data;
 };
+
+export const deleteDocument = async (docId: string) => {
+  const res: AxiosResponse<{ id: string }> = await api.delete(
+    `/document/${docId}`,
+  );
+  return res.data;
+};
+
+export const deleteUserAccess = async (docId: string, userId: string) => {
+  const res: AxiosResponse<{ userId: string }> = await api.delete(
+    `/document/${docId}/user-access/${userId}`,
+  );
+  return res.data;
+};

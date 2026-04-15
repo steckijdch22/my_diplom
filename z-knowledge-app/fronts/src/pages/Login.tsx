@@ -16,7 +16,7 @@ const Login = () => {
         return;
       }
       await login(email, password);
-      checkAuth();
+      await checkAuth();
       navigate("/dashboard");
     } catch (error: any) {
       console.log("error with login", error.message);

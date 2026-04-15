@@ -19,46 +19,43 @@ export const EditorRoom: React.FC = () => {
     UserWithAccess[] | null
   >(null);
 
+  const fetchAccessUsers = async () => {
+    try {
+      if (!id) {
+        return;
+      }
+      const accessUsers = await getAccessUsers(id);
+      setUsersWithAccess(accessUsers);
+    } catch (error: any) {
+      console.log(error.message);
+    }
+  };
+
+  const fetchDocument = async () => {
+    setIsDecrypting(true);
+    try {
+      if (!id || !user) {
+        return;
+      }
+      const document = await getDocumentById(id);
+      setDocument(document);
+
+      const privKey = await getPrivateKey(user.userId);
+      if (privKey) {
+        const decryptedKey = await unwrapKey(document.wrappedKey, privKey);
+        setAesKey(decryptedKey);
+      }
+    } catch (error: any) {
+      console.log(error.message);
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDocument = async () => {
-      setIsDecrypting(true);
-      try {
-        if (!id || !user) {
-          return;
-        }
-        const document = await getDocumentById(id);
-        setDocument(document);
-
-        const privKey = await getPrivateKey(user.userId);
-        if (privKey) {
-          const decryptedKey = await unwrapKey(document.wrappedKey, privKey);
-          setAesKey(decryptedKey);
-        }
-      } catch (error: any) {
-        console.log(error.message);
-      } finally {
-        setIsDecrypting(false);
-      }
-    };
-
-    const fetchAccessUsers = async () => {
-      try {
-        if (!id) {
-          return;
-        }
-        const accessUsers = await getAccessUsers(id);
-        setUsersWithAccess(accessUsers);
-      } catch (error: any) {
-        console.log(error.message);
-      }
-    };
     fetchDocument();
     fetchAccessUsers();
   }, [id, user]);
-
-  const handleShare = () => {
-    alert("Модальное окно Share...");
-  };
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col font-sans overflow-hidden">
@@ -117,13 +114,14 @@ export const EditorRoom: React.FC = () => {
           <>{id && <TextEditor documentId={id} aesKey={aesKey} />}</>
         )}
       </main>
-      {aesKey && id && (
+      {aesKey && document && (
         <ShareDocumentModal
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           usersWithAccess={usersWithAccess}
           aesKey={aesKey}
-          docId={id}
+          document={document}
+          onRefresh={fetchAccessUsers}
         />
       )}
     </div>
