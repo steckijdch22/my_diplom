@@ -49,7 +49,7 @@ export class AuthService {
     }
     return {
       accessToken: this.generateToken(user).accessToken,
-      user: { id: user.id, email: user.email, username: user.username },
+      user: { userId: user.id, email: user.email, publicKey: user.publicKey },
     };
   }
 

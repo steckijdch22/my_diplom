@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { getPrivateKey } from "../utils/keyStorage";
 import { decryptData, encryptData, unwrapKey } from "../utils/crypto";
 import { debounce } from "lodash";
+import { toast } from "sonner";
 
 const CURSOR_COLORS = [
   "#f56565",
@@ -80,6 +81,17 @@ export const TextEditor: React.FC<{
       triggerSnapshotSave.flush();
     });
 
+    socket.on("kicked-from-document", (data) => {
+      if (data.roomId === documentId) {
+        toast.error("Доступ отозван", {
+          description: "Владелец документа закрыл вам доступ к редактированию.",
+        });
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1000);
+      }
+    });
+
     const quill = new Quill(editorContainer, {
       modules: {
         toolbar: [
@@ -115,6 +127,7 @@ export const TextEditor: React.FC<{
       triggerSnapshotSave.cancel();
       socket.off("receive-update", handleReceiveUpdate);
       socket.off("request-sync");
+      socket.off("kicked-from-document");
       socket.disconnect();
       ydoc.destroy();
     };

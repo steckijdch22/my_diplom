@@ -19,6 +19,7 @@ import { getPrivateKey, savePrivateKeys } from "../utils/keyStorage";
 import { KeyWarningModal } from "../components/KeyWarningModal";
 import { logoutApi } from "../api/auth";
 import { toast } from "sonner";
+import { exportKeyToFile, importKeyFromFile } from "../utils/keyBackup";
 
 export interface DocumentItem {
   id: string;
@@ -33,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [openNewModal, setNewOpenModal] = useState<boolean>(false);
   const [isKeyMissing, setIsKeyMissing] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   const handleCreateNew = async (title: string) => {
     if (!user || !user.publicKey) {
@@ -67,62 +69,29 @@ const Dashboard: React.FC = () => {
   };
 
   const handleExportKey = async () => {
-    try {
-      if (!user) {
-        return;
-      }
-      const privKey = await getPrivateKey(user.userId);
-      if (!privKey) {
-        toast.error("Ключ не найден", {
-          description: "Приватный ключ отсутствует в этом браузере",
-        });
-        return;
-      }
-      const keyStr = await exportPrivateKey(privKey);
-      const blob = new Blob([keyStr], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `zerodoc_${user.email}.key`;
-      link.click();
-      URL.revokeObjectURL(url);
+    if (!user) return;
 
-      toast.success("Бэкап ключа создан", {
-        description: "Сохраните этот файл в надежном месте!",
-      });
-    } catch (error) {
-      toast.error("Ошибка при экспорте ключа");
-    }
+    toast.promise(exportKeyToFile(user.userId, user.email), {
+      loading: "Подготовка файла ключа...",
+      success: (msg) => msg,
+      error: (err) => err.message,
+    });
   };
 
   const handleImportKey = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user) {
-      return;
-    }
-    const importAction = new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const keyStr = e.target?.result as string;
-          const importedKey = await importPrivateKeyStr(keyStr);
-          await savePrivateKeys(user.userId, importedKey);
-          resolve("Ключ успешно импортирован");
-          setIsKeyMissing(false);
-          window.location.reload();
-        } catch (err) {
-          reject("Неверный формат файла ключа");
-        }
-      };
-      reader.onerror = () => reject("Ошибка чтения файла");
-      reader.readAsText(file);
-    });
-    toast.promise(importAction, {
+    if (!file || !user) return;
+
+    toast.promise(importKeyFromFile(file, user.userId), {
       loading: "Проверка и импорт ключа...",
-      success: (msg: any) => msg,
-      error: (err) => err,
+      success: (msg) => {
+        setIsKeyMissing(false);
+        setTimeout(() => window.location.reload(), 1500);
+        return msg;
+      },
+      error: (err) => err.message,
     });
   };
 
@@ -143,7 +112,7 @@ const Dashboard: React.FC = () => {
   const handleLogout = async () => {
     const logoutAction = async () => {
       await logoutApi();
-      await checkAuth();
+      navigate("/login");
       return "Вы вышли из системы";
     };
 
@@ -174,7 +143,7 @@ const Dashboard: React.FC = () => {
         }
       }
     };
-
+    console.log("usre context:", user);
     fetchDocuments();
   }, [user]);
 
@@ -257,7 +226,42 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </nav>
-
+      {!isKeyMissing && (
+        <div className="bg-purple-600 text-white px-6 py-3 flex justify-between items-center shadow-inner animate-in slide-in-from-top duration-500">
+          <div className="flex items-center space-x-3">
+            <div className="bg-white/20 p-2 rounded-full">
+              <svg
+                className="w-5 h-5 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </div>
+            <p className="text-sm font-medium">
+              <span className="font-bold text-purple-200 uppercase mr-2 text-[10px] tracking-widest border border-purple-300 px-1.5 py-0.5 rounded">
+                Важно
+              </span>
+              Ваш аккаунт защищен сквозным шифрованием. Скачайте файл
+              восстановления, чтобы не потерять доступ к данным.
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={handleExportKey}
+              className="bg-white text-purple-600 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-50 transition-colors shadow-sm"
+            >
+              Скачать ключ (.key)
+            </button>
+          </div>
+        </div>
+      )}
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Мои документы</h1>

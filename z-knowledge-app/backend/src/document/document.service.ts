@@ -1,14 +1,21 @@
 import {
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DocumentMapper } from './document.mapper';
+import { DocumentGateway } from './document.gateway';
 
 @Injectable()
 export class DocumentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => DocumentGateway))
+    private readonly documentGateway: DocumentGateway,
+  ) {}
 
   async create(userId: string, title: string, documentKey: string) {
     return this.prisma.$transaction(async (tx) => {
@@ -173,7 +180,7 @@ export class DocumentService {
     if (!document) {
       throw new Error('Документ не найден');
     }
-    return await this.prisma.documentAccess.delete({
+    const deletedAccess = await this.prisma.documentAccess.delete({
       where: {
         documentId_userId: {
           documentId: docId,
@@ -181,5 +188,7 @@ export class DocumentService {
         },
       },
     });
+    await this.documentGateway.kickUser(userId, docId);
+    return deletedAccess;
   }
 }

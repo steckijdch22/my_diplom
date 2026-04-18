@@ -76,7 +76,7 @@ export class DocumentController {
     @Request() req: any,
   ) {
     const ownerId = req.user.userId;
-    return this.docService.deleteUserAccess(ownerId, userId, docId);
+    return await this.docService.deleteUserAccess(ownerId, userId, docId);
   }
 
   @Delete(':id')
