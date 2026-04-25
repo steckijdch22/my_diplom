@@ -21,7 +21,7 @@ import { forwardRef, Inject, Logger } from '@nestjs/common';
 })
 export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer() server: Server;
-  private readonly logger = new Logger('DocumentGateway'); // Используем встроенный логгер NestJS
+  private readonly logger = new Logger('DocumentGateway');
 
   private saveTimers = new Map<string, NodeJS.Timeout>();
   private socketToRoom = new Map<string, string>();
@@ -37,7 +37,6 @@ export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
 
   afterInit(server: Server) {
     server.use(SocketAuthMiddleware(this.jwtService, this.configService));
-    this.logger.log('🔐 WebSocket Auth Middleware успешно подключен');
   }
 
   handleConnection(client: Socket) {
@@ -47,9 +46,6 @@ export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
         this.userSockets.set(user.userId, new Set());
       }
       this.userSockets.get(user.userId)?.add(client.id);
-      this.logger.debug(
-        `📡 Соединение установлено: ${client.id} (User: ${user.email})`,
-      );
     }
   }
 
@@ -99,8 +95,6 @@ export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
     const { roomId, update } = data;
     const updateUint8 = new Uint8Array(update);
 
-    // Логируем только объем инкрементальных правок
-    // (обычно они маленькие, поэтому в байтах)
     this.logger.verbose(
       `🔄 [Sync] Room: ${roomId} | Delta Size: ${updateUint8.length} bytes`,
     );
@@ -119,17 +113,14 @@ export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
     const stateUint8 = new Uint8Array(fullState);
     const sizeKB = (stateUint8.length / 1024).toFixed(2);
 
-    // 1. Быстрое сохранение в Redis
     await this.redisService.set(key, stateUint8);
 
-    // 2. Рассылка новичкам
     client.to(roomId).emit('receive-update', stateUint8);
 
     this.logger.log(
       `💾 [Snapshot] Room: ${roomId} | Total Size: ${sizeKB} KB | Redis write: ${Date.now() - startTime}ms`,
     );
 
-    // 3. Планируем запись в тяжелую БД
     this.scheduleSave(roomId, stateUint8);
   }
 
@@ -146,10 +137,6 @@ export class DocumentGateway implements OnGatewayDisconnect, OnGatewayInit {
       const sockets = await this.server.in(roomId).fetchSockets();
 
       if (sockets.length === 0) {
-        this.logger.log(
-          `🏠 [Room] ${roomId} пуста. Выполнение финальной очистки...`,
-        );
-
         if (this.saveTimers.has(roomId)) {
           clearTimeout(this.saveTimers.get(roomId));
           this.saveTimers.delete(roomId);
