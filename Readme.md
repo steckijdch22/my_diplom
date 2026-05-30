@@ -23,8 +23,8 @@
 1. **Клонируйте репозиторий:**
 
    ```bash
-   git clone https://github.com/ваш-логин/zerodoc.git
-   cd zerodoc
+   git clone https://github.com/steckijdch22/my_diplom.git
+   cd my_diplom
    ```
 
 2. **Подготовьте файл окружения:**
